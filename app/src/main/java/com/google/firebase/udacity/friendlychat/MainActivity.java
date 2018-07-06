@@ -24,6 +24,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -204,8 +205,11 @@ public class MainActivity extends AppCompatActivity {
             }
         } else if(requestCode == RC_PHOTO_PICKER && resultCode == RESULT_OK){
             Uri selectedImageUri = data.getData();
-            StorageReference photoRef = storageReference.child(selectedImageUri.getLastPathSegment());
-            Toast.makeText(this, "selectedImageUri.getLastPathSegment():     " + selectedImageUri.getLastPathSegment(), Toast.LENGTH_SHORT).show();
+            String imageID = selectedImageUri.getPath().substring(selectedImageUri.getPath().lastIndexOf('/'), selectedImageUri.getPath().length());
+            StorageReference photoRef = storageReference.child("images/"+imageID);
+
+            Log.d("File Path", selectedImageUri.getLastPathSegment());
+
             photoRef.putFile(selectedImageUri).addOnSuccessListener(this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
                 @Override
                 public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
