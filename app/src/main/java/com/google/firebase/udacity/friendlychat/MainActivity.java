@@ -16,6 +16,7 @@
 package com.google.firebase.udacity.friendlychat;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -35,6 +36,7 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.ChildEventListener;
@@ -42,6 +44,9 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -52,6 +57,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
+    private static final int RC_PHOTO_PICKER = 2;
 
     public static final String ANONYMOUS = "anonymous";
     public static final int DEFAULT_MSG_LENGTH_LIMIT = 1000;
@@ -70,6 +76,11 @@ public class MainActivity extends AppCompatActivity {
     private ChildEventListener childEventListener;
     private FirebaseAuth firebaseAuth;
     private FirebaseAuth.AuthStateListener authStateListener;
+    private FirebaseStorage firebaseStorage;
+    private StorageReference storageReference;
+
+
+
     private static final int RC_SIGN_IN = 123;
 
     @Override
@@ -80,7 +91,10 @@ public class MainActivity extends AppCompatActivity {
          mUsername = ANONYMOUS;
          firebaseDatabase = firebaseDatabase.getInstance();
          firebaseAuth = firebaseAuth.getInstance();
+         firebaseStorage = FirebaseStorage.getInstance();
+
          databaseReference = firebaseDatabase.getReference().child("messages");
+         storageReference = firebaseStorage.getReference().child("chat_photos");
 
 
 
@@ -103,7 +117,11 @@ public class MainActivity extends AppCompatActivity {
         mPhotoPickerButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // TODO: Fire an intent to show an image picker
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+//                intent.setType("image/jpg");
+                intent.setType("image/png");
+                intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+                startActivityForResult(Intent.createChooser(intent, "Complete action using"), RC_PHOTO_PICKER);
             }
         });
 
@@ -132,8 +150,6 @@ public class MainActivity extends AppCompatActivity {
         mSendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // TODO: Send messages on click
-
                 // Clear input box
                 Date date = new Date();
                 Date newDate = new Date(date.getTime() + (604800000L * 2) + (24 * 60 * 60));
@@ -179,14 +195,37 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-//        if(requestCode == RC_SIGN_IN){
+        if(requestCode == RC_SIGN_IN){
             if(resultCode == RESULT_OK){
                 Toast.makeText(this, "Signed in!", Toast.LENGTH_SHORT).show();
             }else if(resultCode == RESULT_CANCELED){
             Toast.makeText(this, "Signed in canceled!", Toast.LENGTH_SHORT).show();
             finish();
             }
-//        }
+        } else if(requestCode == RC_PHOTO_PICKER && resultCode == RESULT_OK){
+            Uri selectedImageUri = data.getData();
+            StorageReference photoRef = storageReference.child(selectedImageUri.getLastPathSegment());
+            Toast.makeText(this, "selectedImageUri.getLastPathSegment():     " + selectedImageUri.getLastPathSegment(), Toast.LENGTH_SHORT).show();
+            photoRef.putFile(selectedImageUri).addOnSuccessListener(this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                    Date date = new Date();
+                    Date newDate = new Date(date.getTime() + (604800000L * 2) + (24 * 60 * 60));
+                    SimpleDateFormat dt = new SimpleDateFormat("yyyy-MM-dd");
+                    String stringdate = dt.format(newDate);
+
+                    taskSnapshot.getStorage().getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                        @Override
+                        public void onSuccess(Uri uri) {
+                            FriendlyMessage friendlyMessage = new FriendlyMessage(null, mUsername, uri.toString(), stringdate);
+                            databaseReference.push().setValue(friendlyMessage);
+                        }
+                    });
+
+                }
+            });
+
+        }
     }
 
     private void onSignedOutCleanup() {
